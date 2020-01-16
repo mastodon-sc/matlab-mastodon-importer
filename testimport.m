@@ -5,6 +5,7 @@ clear
 clc
 
 source_file = 'samples/datasethdf5.mastodon';
+% source_file = 'samples/small.mastodon';
 
 
 
@@ -13,7 +14,7 @@ LINK_RECORD_SIZE    = 4 * 4; % 4 ints
 
 %% Uncompress data file into temp dir.
 
-filenames = unzip( source_file, tempdir );
+filenames = unzip( source_file, fullfile( tempdir, source_file ) );
 
 %% Identify uncompressed files.
 
@@ -27,7 +28,7 @@ stream_header.stream_version = fread( fid, 1, 'int16' );
 %% Read spots.
 
 % Read first block.
-block = read_block( fid );
+block = read_graph_block( fid );
 index = 1;
 
 % Read N vertices.
@@ -44,14 +45,14 @@ c_22    = NaN( n_vertices, 1 );
 c_23    = NaN( n_vertices, 1 );
 c_33    = NaN( n_vertices, 1 );
 bsrs    = NaN( n_vertices, 1 );
-id = NaN( n_vertices, 1 );
+id      = NaN( n_vertices, 1 );
 
 for i = 1 : n_vertices
     
     if ( index + SPOT_RECORD_SIZE - 1 ) > numel( block )
         % We need to read another block and append the remainder.
         
-        new_block = read_block( fid );
+        new_block = read_graph_block( fid );
         block = [
             block( index : end )
             new_block ];
@@ -73,7 +74,7 @@ for i = 1 : n_vertices
     c_23( i )   = spot.cov_23;
     c_33( i )   = spot.cov_33;
     bsrs( i )   = spot.bsrs;
-    id( i )   = (i - 1);
+    id( i )     = (i - 1);
     
 end
 
@@ -97,7 +98,7 @@ spot_table = table( ...
 if ( index + 4 - 1 ) > numel( block )
     % We need to read another block and append the remainder.
     
-    new_block = read_block( fid );
+    new_block = read_graph_block( fid );
     block = [
         block( index : end )
         new_block ];
@@ -114,14 +115,14 @@ source_id	= NaN( n_edges, 1 );
 target_id	= NaN( n_edges, 1 );
 source_out_index	= NaN( n_edges, 1 );
 target_in_index     = NaN( n_edges, 1 );
-id = NaN( n_edges, 1 );
+id          = NaN( n_edges, 1 );
 
 for i = 1 : n_edges
     
     if ( index + LINK_RECORD_SIZE - 1 ) > numel( block )
         % We need to read another block and append the remainder.
         
-        new_block = read_block( fid );
+        new_block = read_graph_block( fid );
         block = [
             block( index : end )
             new_block ];
@@ -140,12 +141,28 @@ for i = 1 : n_edges
     
 end
 
-edge_table = table( ...
+link_table = table( ...
     id, ...
     source_id, ...
     target_id, ...
     source_out_index, ...
     target_in_index );
+
+%% Read the label property.
+% The label property is written as a string property map. In Mastodon, they
+% are saved as the concatenation of:
+% - an int[] array containing the ids of the object the labels are defined
+% for.
+% - a byte[] array, resulting from the concatenation of the of the UTF8
+% representation of each string.
+
+[ labels, idx ] = read_label_property( fid );
+
+% Put labels as row names in the spot table.
+row_names = cell( size( spot_table, 1 ), 1 );
+row_names( idx+1 ) = labels;
+
+spot_table.labels = row_names;
 
 %% Finish!
 
@@ -155,10 +172,77 @@ fclose( fid );
 
 %% Functions.
 
-function block = read_block( fid )
+
+function [ labels, idx ] = read_label_property( fid )
+
+    EXPECTED_LABEL_HEADER = [ ...
+        117   114     0    19    91    76   106    97   118    97    ...
+        46   108    97   110   103    46    83   116   114   105   110 ...
+        103    59   173   210    86   231   233    29   123    71     2  ...
+        0     0   120   112     0     0     0     1   116     0 ...
+        5   108    97    98   101   108   117   114     0     2    91  ...
+        73    77   186    96    38   118   234   178   165     2 ...
+        0     0   120   112 ]' ;
+    
+    EXPECTED_STRING_ARRAY_HEADER = [ ...
+        117   114     0     2    91    66   172   243    23   248   ...
+        6     8    84   224     2     0     0   120   112 ]' ;
+    
+    % Read and check the label property header. It should be the same for
+    % all files.
+    label_header = fread( fid, 67, '*uint8' );
+    if ~all( label_header == EXPECTED_LABEL_HEADER )
+        error( 'MastodonImporter:badBinFile', ...
+            'Unexpected header for the serialized label property.' )
+    end
+    
+    % Read number of labels.
+    n_labels = fread( fid, 1, 'int' );
+    
+    % Read the index of each label -> map to vertex id.
+    idx = NaN( n_labels, 1 );
+    for i = 1 : n_labels
+        idx( i ) = fread( fid, 1, 'int' );
+    end
+    
+    % Read and check the string array header. It should be the same for
+    % all files.
+    string_array_header = fread( fid, 19, '*uint8' );
+    if ~all( string_array_header == EXPECTED_STRING_ARRAY_HEADER )
+        error( 'MastodonImporter:badBinFile', ...
+            'Unexpected header for the serialized label string arrays.' )
+    end
+    
+    % Read the total length of the byte array that builds the string array.
+    string_array_block_size = fread( fid, 1, 'int' );
+    
+    % Read the byte block.
+    string_array_block = fread( fid, string_array_block_size, '*uint8' );
+    
+    % Read each label from the byte block.
+    labels = cell( n_labels, 1 );
+    index = 1;
+    for i = 1 : n_labels
+        [ labels{ i }, index ] = read_block_utf8( string_array_block, index );
+    end
+    
+end
+
+function [ str, index ] = read_block_utf8( block, index )
+    % Serialized UTF8 string starts with a short int giving the string
+    % length.
+    [ str_length, index ] = read_block_short_le( block, index );
+    % Then we just have to convert the right number of bytes to chars.
+    bytes = block( index : index + str_length - 1 );
+    str = native2unicode( bytes', 'UTF-8' );
+    index  = index + str_length;
+end
+
+function block = read_graph_block( fid )
+    % Read a block in the graph section of the model.raw file.
 
     % We must re-read the block header. Make of the key and the block size.
-    block_data_long_key = fread( fid, 1, 'int8' );
+    block_data_long_key = fread( fid, 1, 'uint8' );
     if block_data_long_key ~= 122
         error( 'MastodonImporter:badBinFile', ...
             'Could not find the key for block size in binary file.' )
@@ -200,14 +284,28 @@ function [ i, index ] = read_block_int_le( block, index )
 end
 
 function [ i, index ] = read_block_int( block, index )
-    % BE to LE.
     i = typecast( block( index : index + 3 ), 'int32' );
     index = index + 4;
+end
+
+function [ i, index ] = read_block_short_le( block, index )
+    i = typecast( block( index + 1 : -1  : index  ), 'uint16' );
+    index = index + 2;
 end
 
 function [ i, index ] = read_block_double( block, index )
     i = typecast( block( index : index + 7 ), 'double' );
     index = index + 8;
+end
+
+function str = to_hex_str( bytes ) %#ok<DEFNU>
+    % User-friendly representation of bytes.
+    d = dec2hex( bytes )';
+    str = d(:)';
+    str = strtrim( regexprep( str, '.{40}', '$0\n' ) );
+    str = strtrim( regexprep( str, '[^\n]{8}', '$0  ' ) );
+    str = strtrim( regexprep( str, '[^\n]{2}', '$0 ' ) );
+
 end
 
 function model_file = get_model_file( filenames )
