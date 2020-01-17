@@ -31,7 +31,7 @@ function graph = import_mastodon_graph( mastodon_model_file )
     % We assume that the row indices are equal to the vertex id + 1.
     row_names( idx + 1 ) = labels;
     
-    spot_table.labels = row_names;
+    spot_table.label = row_names;
     
     %% Finished reading!
     
@@ -303,16 +303,6 @@ function graph = import_mastodon_graph( mastodon_model_file )
     function [ i, index ] = read_block_double( block, index )
         i = typecast( block( index : index + 7 ), 'double' );
         index = index + 8;
-    end
-
-    function str = to_hex_str( bytes ) %#ok<DEFNU>
-        % User-friendly representation of bytes.
-        d = dec2hex( bytes )';
-        str = d(:)';
-        str = strtrim( regexprep( str, '.{40}', '$0\n' ) );
-        str = strtrim( regexprep( str, '[^\n]{8}', '$0  ' ) );
-        str = strtrim( regexprep( str, '[^\n]{2}', '$0 ' ) );
-        
     end
 
 end
