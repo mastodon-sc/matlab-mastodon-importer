@@ -6,11 +6,11 @@ clc
 
 source_file = 'samples/mamutproject.mastodon';
 % source_file = 'samples/datasethdf5.mastodon';
-% source_file = 'samples/small.mastodon';
+% source_file = 'samples/small2.mastodon';
 
 
 % Load it.
-G = import_mastodon( source_file );
+[ G, tss ] = import_mastodon( source_file );
 
 %% Analyze the graph a little bit.
 
@@ -49,9 +49,47 @@ for i = 1 : n_tracks
         'LineWidth', 2, ...
         'NodeColor', colors( i, : ), ...
         'NodeLabel', '' )
+    
 end
 
-% Plot all the cells of time-point 1 as ellipsoids.
+%% Set the color by a tag-set.
+% Because we store the tag but not the tag id, we have to do a small
+% gymnastics to retrieve the color of each vertex.
+
+
+target_ts = 2; % Take the first tag-set.
+
+node_colors = zeros( numnodes( G_filt ), 3 );
+edge_colors = zeros( numedges( G_filt ), 3 );
+
+tag_set = tss( target_ts );
+n_tags = numel( tag_set.tags );
+for i = 1 : n_tags    
+    tag = tag_set.tags( i );
+
+    idx = ( G_filt.Nodes.( tag_set.name ) == tag.label );
+    node_colors( idx, : ) = repmat( to_hex_color( tag.color ), [ sum(idx), 1 ] );
+
+    idx = ( G_filt.Edges.( tag_set.name ) == tag.label );
+    edge_colors( idx, : ) = repmat( to_hex_color( tag.color ), [ sum(idx), 1 ] );
+
+end
+
+
+figure
+hold on
+
+plot( G_filt, ...
+    'XData', G_filt.Nodes.x, ...
+    'YData', G_filt.Nodes.y, ...
+    'ZData', G_filt.Nodes.z, ...
+    'EdgeColor', colors( i, : ),...
+    'NodeColor', node_colors, ...
+    'EdgeColor', edge_colors, ...
+    'MarkerSize', 10, ...
+    'NodeLabel', '' )
+
+%% Plot all the cells of time-point 1 as ellipsoids.
 
 
 idx = G_filt.Nodes.t == 0;
@@ -78,4 +116,11 @@ for i = 1 : n_spots
 end
 
 
+
+function rgb = to_hex_color( val )
+
+    hex_code = dec2hex( typecast( int32( val ), 'uint32'  ) );   
+    rgb = reshape( sscanf( hex_code( 1 : 6 ).', '%2x' ), 3, []).' / 255;
+    
+end
 
