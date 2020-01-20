@@ -55,6 +55,17 @@ classdef JavaRawReader < handle
              end            
         end
         
+        %% Get a double.
+        function val = read_double( obj )
+            try
+                val = typecast( obj.block( obj.index : obj.index + 7 ), 'double' );
+                obj.index = obj.index + 8;
+            catch ME %#ok<NASGU>
+                fetch_block( obj )
+                val = read_double( obj );
+            end
+        end
+        
         %% Get an int.
         function val = read_int( obj )
             try
