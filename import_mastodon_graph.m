@@ -1,29 +1,18 @@
 function graph = import_mastodon_graph( mastodon_model_file )
 
-    % Constants.
-    SPOT_RECORD_SIZE    = 84; % bytes. 10 doubles 
-    % (8 bytes each, x, y, z, c11, c12, c13, c22, c23, c33, brq ) + 1 int (4 bytes, time-point).
-    LINK_RECORD_SIZE    = 4 * 4; % 4 ints
-    
-    fid = fopen( mastodon_model_file, 'r', 'b' );
-    
-    % Read java stream header.
-    stream_header.stream_magic_number = fread( fid, 1, 'int16' );
-    stream_header.stream_version = fread( fid, 1, 'int16' ); %#ok<STRNU>
+   
+    %% Open file.
+
+    reader = JavaRawReader( mastodon_model_file );
     
     %% Read the graph.
     
-    [ spot_table, link_table ] = read_graph( fid );
+    [ spot_table, link_table ] = read_graph( reader );
     
     %% Read the label property.
-    % The label property is written as a string property map. In Mastodon, they
-    % are saved as the concatenation of:
-    % - an int[] array containing the ids of the object the labels are defined
-    % for.
-    % - a byte[] array, resulting from the concatenation of the of the UTF8
-    % representation of each string.
     
-    [ labels, idx ] = read_label_property( fid );
+    
+    [ labels, idx ]  = read_label_property( reader );
     
     % Put labels as row names in the spot table.
     row_names =  cell( size( spot_table, 1), 1 );
@@ -35,7 +24,7 @@ function graph = import_mastodon_graph( mastodon_model_file )
     
     %% Finished reading!
     
-    fclose( fid );
+    reader.close()
     
     %% Assemble graph.
     
@@ -45,24 +34,18 @@ function graph = import_mastodon_graph( mastodon_model_file )
     
     graph = digraph( edge_table, spot_table );
     
-    
-    
-    
+        
     %% Functions.
     
     
-    function[ spot_table, link_table ] = read_graph( fid )
+    function[ spot_table, link_table ] = read_graph( reader )
         
         %
         % Read spots.
         %
         
-        % Read first block.
-        block = read_graph_block( fid );
-        index = 1;
-        
         % Read N vertices.
-        [ n_vertices, index ] = read_block_int_le( block, index );
+        n_vertices = reader.read_int();
         
         x       = NaN( n_vertices, 1 );
         y       = NaN( n_vertices, 1 );
@@ -79,19 +62,7 @@ function graph = import_mastodon_graph( mastodon_model_file )
         
         for i = 1 : n_vertices
             
-            if ( index + SPOT_RECORD_SIZE - 1 ) > numel( block )
-                % We need to read another block and append the remainder.
-                
-                new_block = read_graph_block( fid );
-                block = [
-                    block( index : end )
-                    new_block ];
-                
-                % Reset index.
-                index = 1;
-            end
-            
-            [ spot, index ] = read_block_spot( block, index );
+            spot = read_block_spot( reader );
             
             x( i )      = spot.x;
             y( i )      = spot.y;
@@ -126,21 +97,8 @@ function graph = import_mastodon_graph( mastodon_model_file )
         % Read links.
         %
         
-        if ( index + 4 - 1 ) > numel( block )
-            % We need to read another block and append the remainder.
-            
-            new_block = read_graph_block( fid );
-            block = [
-                block( index : end )
-                new_block ];
-            
-            % Reset index.
-            index = 1;
-        end
-        
-        
         % Read N edges.
-        [ n_edges, index ] = read_block_int_le( block, index );
+        n_edges = reader.read_int();
         
         source_id	= NaN( n_edges, 1 );
         target_id	= NaN( n_edges, 1 );
@@ -150,19 +108,7 @@ function graph = import_mastodon_graph( mastodon_model_file )
         
         for i = 1 : n_edges
             
-            if ( index + LINK_RECORD_SIZE - 1 ) > numel( block )
-                % We need to read another block and append the remainder.
-                
-                new_block = read_graph_block( fid );
-                block = [
-                    block( index : end )
-                    new_block ];
-                
-                % Reset index.
-                index = 1;
-            end
-            
-            [ link, index ] = read_block_link( block, index );
+            link = read_block_link( reader );
             
             source_id( i )	= link.source_id;
             target_id( i )	= link.target_id;
@@ -180,129 +126,45 @@ function graph = import_mastodon_graph( mastodon_model_file )
             target_in_index );
     end
     
-    function [ labels, idx ] = read_label_property( fid )
+    function [ labels, vertex_ids ] = read_label_property( reader )
+        % The label property is written as a string property map. In
+        % Mastodon, they are saved as the concatenation of: - an int[]
+        % array containing the ids of the object the labels are defined
+        % for. - a byte[] array, resulting from the concatenation of the of
+        % the UTF8 representation of each string.
         
-        EXPECTED_LABEL_HEADER = [ ...
-            117   114     0    19    91    76   106    97   118    97    ...
-            46   108    97   110   103    46    83   116   114   105   110 ...
-            103    59   173   210    86   231   233    29   123    71     2  ...
-            0     0   120   112     0     0     0     1   116     0 ...
-            5   108    97    98   101   108   117   114     0     2    91  ...
-            73    77   186    96    38   118   234   178   165     2 ...
-            0     0   120   112 ]' ;
-        
-        EXPECTED_STRING_ARRAY_HEADER = [ ...
-            117   114     0     2    91    66   172   243    23   248   ...
-            6     8    84   224     2     0     0   120   112 ]' ;
-        
-        % Read and check the label property header. It should be the same for
-        % all files.
-        label_header = fread( fid, 67, '*uint8' );
-        if ~all( label_header == EXPECTED_LABEL_HEADER )
-            error( 'MastodonImporter:badBinFile', ...
-                'Unexpected header for the serialized label property.' )
-        end
-        
-        % Read number of labels.
-        n_labels = fread( fid, 1, 'int' );
-        
-        % Read the index of each label -> map to vertex id.
-        idx = NaN( n_labels, 1 );
-        for i = 1 : n_labels
-            idx( i ) = fread( fid, 1, 'int' );
-        end
-        
-        % Read and check the string array header. It should be the same for
-        % all files.
-        string_array_header = fread( fid, 19, '*uint8' );
-        if ~all( string_array_header == EXPECTED_STRING_ARRAY_HEADER )
-            error( 'MastodonImporter:badBinFile', ...
-                'Unexpected header for the serialized label string arrays.' )
-        end
-        
-        % Read the total length of the byte array that builds the string array.
-        string_array_block_size = fread( fid, 1, 'int' );
-        
-        % Read the byte block.
-        string_array_block = fread( fid, string_array_block_size, '*uint8' );
-        
-        % Read each label from the byte block.
+        string_properties   = reader.read_string_array(); %#ok<NASGU>
+        vertex_ids          = reader.read_int_array();
+        n_labels = numel( vertex_ids );
+        string_array_block  = reader.read_byte_array();
+        block_reader = ByteBlockReader( string_array_block );
         labels = cell( n_labels, 1 );
-        index = 1;
-        for i = 1 : n_labels
-            [ labels{ i }, index ] = read_block_utf8( string_array_block, index );
-        end
+        for i = 1 : numel( vertex_ids )
+            labels{ i }= block_reader.read_utf8();
+        end        
+    end
+
+    function link = read_block_link( reader )
+        
+        link.source_id	= reader.read_int();
+        link.target_id	= reader.read_int();
+        link.source_out_index   = reader.read_int();
+        link.target_in_index    = reader.read_int();
         
     end
 
-    function [ str, index ] = read_block_utf8( block, index )
-        % Serialized UTF8 string starts with a short int giving the string
-        % length.
-        [ str_length, index ] = read_block_short_le( block, index );
-        % Then we just have to convert the right number of bytes to chars.
-        bytes = block( index : index + str_length - 1 );
-        str = native2unicode( bytes', 'UTF-8' );
-        index  = index + str_length;
-    end
-
-    function block = read_graph_block( fid )
-        % Read a block in the graph section of the model.raw file.
-        
-        % We must re-read the block header. Make of the key and the block size.
-        block_data_long_key = fread( fid, 1, 'uint8' );
-        if block_data_long_key ~= 122
-            error( 'MastodonImporter:badBinFile', ...
-                'Could not find the key for block size in binary file.' )
-        end
-        block_data_long = fread( fid, 1, 'int' );
-        
-        % Now we can read the block.
-        block = fread(fid, block_data_long, '*uint8' );
-    end
-
-    function [ link, index ] = read_block_link( block, index )
-        
-        [ link.source_id, index ]	= read_block_int_le( block, index );
-        [ link.target_id, index ]	= read_block_int_le( block, index );
-        [ link.source_out_index, index ]	= read_block_int_le( block, index );
-        [ link.target_in_index, index ]     = read_block_int_le( block, index );
-        
-    end
-
-    function [ spot, index ] = read_block_spot( block, index )
-        
-        [ spot.x, index ]       = read_block_double( block, index );
-        [ spot.y, index ]       = read_block_double( block, index );
-        [ spot.z, index ]       = read_block_double( block, index );
-        [ spot.t, index ]       = read_block_int( block, index );
-        [ spot.cov_11, index ]   = read_block_double( block, index );
-        [ spot.cov_12, index ]   = read_block_double( block, index );
-        [ spot.cov_13, index ]   = read_block_double( block, index );
-        [ spot.cov_22, index ]   = read_block_double( block, index );
-        [ spot.cov_23, index ]   = read_block_double( block, index );
-        [ spot.cov_33, index ]   = read_block_double( block, index );
-        [ spot.bsrs, index ]    = read_block_double( block, index );
-    end
-
-    function [ i, index ] = read_block_int_le( block, index )
-        % BE to LE.
-        i = typecast( block( index + 3 : -1 : index ), 'int32' );
-        index = index + 4;
-    end
-
-    function [ i, index ] = read_block_int( block, index )
-        i = typecast( block( index : index + 3 ), 'int32' );
-        index = index + 4;
-    end
-
-    function [ i, index ] = read_block_short_le( block, index )
-        i = typecast( block( index + 1 : -1  : index  ), 'uint16' );
-        index = index + 2;
-    end
-
-    function [ i, index ] = read_block_double( block, index )
-        i = typecast( block( index : index + 7 ), 'double' );
-        index = index + 8;
+    function spot = read_block_spot( reader )        
+        spot.x        = reader.read_double();
+        spot.y        = reader.read_double();
+        spot.z        = reader.read_double();
+        spot.t        = reader.read_int_rev();
+        spot.cov_11   = reader.read_double();
+        spot.cov_12   = reader.read_double();
+        spot.cov_13   = reader.read_double();
+        spot.cov_22   = reader.read_double();
+        spot.cov_23   = reader.read_double();
+        spot.cov_33   = reader.read_double();
+        spot.bsrs     = reader.read_double();
     end
 
 end
