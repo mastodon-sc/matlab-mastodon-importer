@@ -62,19 +62,19 @@ function graph = import_mastodon_graph( mastodon_model_file )
         
         for i = 1 : n_vertices
             
-            spot = read_block_spot( reader );
-            
-            x( i )      = spot.x;
-            y( i )      = spot.y;
-            z( i )      = spot.z;
-            t( i )      = spot.t;
-            c_11( i )   = spot.cov_11;
-            c_12( i )   = spot.cov_12;
-            c_13( i )   = spot.cov_13;
-            c_22( i )   = spot.cov_22;
-            c_23( i )   = spot.cov_23;
-            c_33( i )   = spot.cov_33;
-            bsrs( i )   = spot.bsrs;
+            xyz         = reader.read_n_doubles( 3 );
+            x( i )      = xyz( 1 );
+            y( i )      = xyz( 2 );
+            z( i )      = xyz( 3 );
+            t( i )      = reader.read_int_rev();
+            covs        = reader.read_n_doubles( 7 );
+            c_11( i )   = covs( 1 );
+            c_12( i )   = covs( 2 );
+            c_13( i )   = covs( 3 );
+            c_22( i )   = covs( 4 );
+            c_23( i )   = covs( 5 );
+            c_33( i )   = covs( 6 );
+            bsrs( i )   = covs( 7 );
             id( i )     = (i - 1);
             
         end
@@ -108,12 +108,9 @@ function graph = import_mastodon_graph( mastodon_model_file )
         
         for i = 1 : n_edges
             
-            link = read_block_link( reader );
-            
-            source_id( i )	= link.source_id;
-            target_id( i )	= link.target_id;
-            source_out_index( i )	= link.source_out_index;
-            target_in_index( i )	= link.target_in_index;
+            vids = reader.read_n_ints( 4 );
+            source_id( i )	= vids( 1 );
+            target_id( i )	= vids( 2 );
             id( i ) = ( i - 1 );
             
         end
@@ -142,29 +139,6 @@ function graph = import_mastodon_graph( mastodon_model_file )
         for i = 1 : numel( vertex_ids )
             labels{ i }= block_reader.read_utf8();
         end        
-    end
-
-    function link = read_block_link( reader )
-        
-        link.source_id	= reader.read_int();
-        link.target_id	= reader.read_int();
-        link.source_out_index   = reader.read_int();
-        link.target_in_index    = reader.read_int();
-        
-    end
-
-    function spot = read_block_spot( reader )        
-        spot.x        = reader.read_double();
-        spot.y        = reader.read_double();
-        spot.z        = reader.read_double();
-        spot.t        = reader.read_int_rev();
-        spot.cov_11   = reader.read_double();
-        spot.cov_12   = reader.read_double();
-        spot.cov_13   = reader.read_double();
-        spot.cov_22   = reader.read_double();
-        spot.cov_23   = reader.read_double();
-        spot.cov_33   = reader.read_double();
-        spot.bsrs     = reader.read_double();
     end
 
 end
