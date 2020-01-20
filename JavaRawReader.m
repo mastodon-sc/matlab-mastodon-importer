@@ -67,10 +67,49 @@ classdef JavaRawReader < ByteBlockReader
            arr = fread( obj.fid, array_size, '*uint8' );
         end
         
+        %% Read an enum value.
+        function [ enum, enum_class ]  = read_enum( obj )
+            
+            enum_struct = read_file_enum_header( obj );
+            enum = obj.read_file_string();
+            enum_class = enum_struct.class_desc.class_name;
+            
+        end
         
     end % public methods
     
     methods ( Access = private )
+        
+        function enum_struct = read_file_enum_header( obj )
+            
+            enum_struct.tc_enum = fread( obj.fid, 1, '*uint8' );
+            if ( enum_struct.tc_enum ~= 126 )
+                error( 'JavaRawReader:notAnEnum', ...
+                    'Could not find the key for enum in binary file.' )
+            end
+           
+            enum_struct.class_desc          = obj.read_file_class_desc();
+            enum_struct.enum_class_desc     = obj.read_file_class_desc();
+            enum_struct.null                = obj.read_file_byte(); % 112 -> #70
+        end
+        
+        %% Read a class_desc block.
+        function class_desc = read_file_class_desc( obj )
+            
+            class_desc.class_desc = fread( obj.fid, 1, '*uint8' );
+            % Check we have the right TC key:
+            if class_desc.class_desc ~= 114
+                error( 'JavaRawReader:notAClassDesc', ...
+                    'Could not find the key for class_desc in binary file.' )
+            end
+            
+            class_desc.class_name          = obj.read_file_utf8();
+            class_desc.serial_version_UID  = obj.read_file_long();
+            class_desc.n_handle_bytes      = obj.read_file_byte(); % should be 2?
+            class_desc.n_handle            = obj.read_file_short();
+            class_desc.end_block           = obj.read_file_byte(); % 120 -> #78
+            
+        end
         
         %% Read the array header.
         % Only works for string arrays, int arrays and byte arrays.
@@ -81,19 +120,8 @@ classdef JavaRawReader < ByteBlockReader
                 error( 'JavaRawReader:notAnArrayAtIndex', ...
                     'Could not find the key for array tag in binary file.' )
             end            
-            arr_struct.class_desc = fread( obj.fid, 1, '*uint8' );
-            % Check we have the right TC:
-            if arr_struct.class_desc ~= 114
-                error( 'JavaRawReader:notAnArrayAtIndex', ...
-                    'Could not find the key for class_desc in binary file.' )
-            end
-                        
-            arr_struct.class_name           = obj.read_file_utf8();
-            arr_struct.serial_version_UID   = obj.read_file_long();
-            arr_struct.n_handle_bytes       = obj.read_file_byte(); % should be 2.
-            arr_struct.n_handle             = obj.read_file_short();
-            arr_struct.end_block            = obj.read_file_byte(); % 120 -> #78
-            arr_struct.null                 = obj.read_file_byte(); % 112 -> #70
+            arr_struct.class_desc   = obj.read_file_class_desc();
+            arr_struct.null         = obj.read_file_byte(); % 112 -> #70
         end
         
         %% Read a long directly from the file (not the block).
