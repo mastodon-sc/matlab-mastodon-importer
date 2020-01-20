@@ -34,6 +34,17 @@ classdef ByteBlockReader < handle
             end
         end
         
+        %% Get N doubles.
+        function vals = read_n_doubles( obj, n )
+            try
+                vals = typecast( obj.block( obj.index : obj.index + ( n * 8 - 1 ) ), 'double' );
+                obj.index = obj.index + n * 8;
+            catch ME %#ok<NASGU>
+                fetch_block( obj )
+                vals = read_n_doubles( obj, n );
+            end
+        end
+        
         %% Get an int.
         function val = read_int( obj )
             try
@@ -43,6 +54,24 @@ classdef ByteBlockReader < handle
                 fetch_block( obj )
                 val = read_int( obj );
             end
+        end
+        
+         %% Get N ints.
+        function vals = read_n_ints( obj, n )
+            if ( obj.index + ( 4*n - 1 ) > numel( obj.block ) )
+                fetch_block( obj )
+            end
+            vals = typecast( obj.block( obj.index + ( 4*n - 1 ) : -1 : obj.index ), 'int32' );
+            obj.index = obj.index + 4*n;
+            vals = flip( vals );
+        end
+        
+         %% Skip an int.
+        function skip_int( obj )
+            if ( obj.index + 3 > numel( obj.block ) )
+                fetch_block( obj );
+            end
+            obj.index = obj.index + 4;
         end
         
         %% Get an int, reveresed order.
