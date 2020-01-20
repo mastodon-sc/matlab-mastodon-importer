@@ -16,8 +16,6 @@ tic
 fprintf('Imported %d spots and %d links in %.1f seconds.\n', ...
     numnodes( G ), numedges( G ), toc )
 
-return
-
 %% Analyze the graph a little bit.
 
 % Split it into tracks.

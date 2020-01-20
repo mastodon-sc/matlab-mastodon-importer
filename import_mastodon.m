@@ -16,34 +16,30 @@ function [ G, tss ] = import_mastodon( source_file )
    % Merge model table and tag table.
    n_tag_set = numel( tss );
    
-   if ~isempty( tag_table_vertices )       
-       for i = 1 : n_tag_set
-           
-           tag_set_name = tss( i ).name;
-           
-           col = categorical();
-           col( numnodes( G ), 1 ) = '<undefined>';
-           
-           [ ~, idx ] = ismember( tag_table_vertices.id, G.Nodes.id );
-           col( idx ) = tag_table_vertices.( tag_set_name );
-           G.Nodes.( tag_set_name ) = col;
-           
-       end
+   for i = 1 : n_tag_set
+       
+       tag_set_name = tss( i ).name;
+       
+       col = categorical();
+       col( numnodes( G ), 1 ) = '<undefined>';
+       
+       [ ~, idx ] = ismember( tag_table_vertices.id, G.Nodes.id );
+       col( idx ) = tag_table_vertices.( tag_set_name );
+       G.Nodes.( tag_set_name ) = col;
+       
    end
    
-   if ~isempty( tag_table_edges )       
-       for i = 1 : n_tag_set
-           
-           tag_set_name = tss( i ).name;
-           
-           col = categorical();
-           col( numedges( G ), 1 ) = '<undefined>';
-           
-           [ ~, idx ] = ismember( tag_table_edges.id, G.Nodes.id );
-           col( idx ) = tag_table_edges.( tag_set_name );
-           G.Edges.( tag_set_name ) = col;
-           
-       end
+   for i = 1 : n_tag_set
+       
+       tag_set_name = tss( i ).name;
+       
+       col = categorical();
+       col( numedges( G ), 1 ) = '<undefined>';
+       
+       [ ~, idx ] = ismember( tag_table_edges.id, G.Nodes.id );
+       col( idx ) = tag_table_edges.( tag_set_name );
+       G.Edges.( tag_set_name ) = col;
+       
    end
    
     
