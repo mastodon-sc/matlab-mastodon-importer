@@ -1,15 +1,14 @@
-classdef JavaRawReader < handle
+classdef JavaRawReader < ByteBlockReader
     
     properties ( SetAccess = private )
         fid
-        block
-        index
     end % properties
     
     methods
         
         %% Constructor.
         function obj = JavaRawReader( raw_file_path )
+            obj@ByteBlockReader( zeros( 0, 0, 'uint8' ) );
             
             EXPECTED_STREAM_MAGIC_NUMBER    = -21267;
             EXPECTED_STREAM_VERSION         = 5;
@@ -19,9 +18,6 @@ classdef JavaRawReader < handle
                 error( 'JavaRawReader:cannotOpenFile', ...
                     'Could not open file %s for reading.', raw_file_path )
             end
-            
-            obj.block = zeros( 0, 0, 'uint8' );
-            obj.index = 0;
             
             stream_magic_number = fread( obj.fid, 1, 'int16' );
             if stream_magic_number ~= EXPECTED_STREAM_MAGIC_NUMBER
@@ -43,73 +39,112 @@ classdef JavaRawReader < handle
         function close( obj )
             fclose( obj.fid );
         end
-
-        %% Get an unsigned byte.
-        function val = read_uint8( obj )  
-             try
-                 val = obj.block( obj.index  );
-                 obj.index = obj.index + 1;
-             catch ME %#ok<NASGU>
-                 fetch_block( obj )
-                 val = read_uint8( obj );
-             end            
-        end
-        
-        %% Get a double.
-        function val = read_double( obj )
-            try
-                val = typecast( obj.block( obj.index : obj.index + 7 ), 'double' );
-                obj.index = obj.index + 8;
-            catch ME %#ok<NASGU>
-                fetch_block( obj )
-                val = read_double( obj );
-            end
-        end
-        
-        %% Get an int.
-        function val = read_int( obj )
-            try
-                val = typecast( obj.block( obj.index + 3 : -1 : obj.index ), 'int32' );
-                obj.index = obj.index + 4;
-            catch ME %#ok<NASGU>
-                fetch_block( obj )
-                val = read_int( obj );
-            end
-        end
-        
-        %% Get a short.
-        function val = read_short( obj )
-            try
-                val = typecast( obj.block( obj.index + 1 : -1 : obj.index ), 'int16' );
-                obj.index = obj.index + 2;
-            catch ME %#ok<NASGU>
-                fetch_block( obj )
-                val = read_short( obj );
-            end
-        end
-        
-        %% Get a string.
-        function str = read_utf8( obj )
-            try
                 
-                % Serialized UTF8 string starts with a short int giving 
-                % the string length.
-                str_length = obj.read_short();
-                % Then we just have to convert the right number of bytes to chars.
-                bytes = obj.block( obj.index : obj.index + str_length - 1 );
-                str = native2unicode( bytes', 'UTF-8' );
-                obj.index = obj.index + str_length;
-                
-            catch ME %#ok<NASGU>
-                fetch_block( obj )
-                str = read_utf8( obj );
-            end
+        %% Read a string array.
+        function arr = read_string_array( obj )
+           obj.read_file_array_header();
+           array_size = obj.read_file_uint();
+           arr = cell( array_size, 1 );
+           for i = 1 : array_size
+               arr{ i } = obj.read_file_string();
+           end           
         end
+        
+        %% Read an int array.
+        function arr = read_int_array( obj )
+           obj.read_file_array_header();
+           array_size = obj.read_file_uint();
+           arr = NaN( array_size, 1 );
+           for i = 1 : array_size
+               arr(i) = obj.read_file_int();
+           end           
+        end
+        
+        %% Read a byte array.
+        function arr = read_byte_array( obj )
+           obj.read_file_array_header();
+           array_size = obj.read_file_uint();
+           arr = fread( obj.fid, array_size, '*uint8' );
+        end
+        
         
     end % public methods
     
     methods ( Access = private )
-
+        
+        %% Read the array header.
+        % Only works for string arrays, int arrays and byte arrays.
+        function arr_struct = read_file_array_header( obj )
+            arr_struct.tc_array = fread( obj.fid, 1, '*uint8' );
+            % Check we have the right TC:
+            if arr_struct.tc_array ~= 117
+                error( 'JavaRawReader:notAnArrayAtIndex', ...
+                    'Could not find the key for array tag in binary file.' )
+            end            
+            arr_struct.class_desc = fread( obj.fid, 1, '*uint8' );
+            % Check we have the right TC:
+            if arr_struct.class_desc ~= 114
+                error( 'JavaRawReader:notAnArrayAtIndex', ...
+                    'Could not find the key for class_desc in binary file.' )
+            end
+                        
+            arr_struct.class_name           = obj.read_file_utf8();
+            arr_struct.serial_version_UID   = obj.read_file_long();
+            arr_struct.n_handle_bytes       = obj.read_file_byte(); % should be 2.
+            arr_struct.n_handle             = obj.read_file_short();
+            arr_struct.end_block            = obj.read_file_byte(); % 120 -> #78
+            arr_struct.null                 = obj.read_file_byte(); % 112 -> #70
+        end
+        
+        %% Read a long directly from the file (not the block).
+        function val = read_file_short( obj )           
+            bytes = fread( obj.fid, 2, '*uint8' );
+            val = typecast( bytes, 'int16' );
+        end
+        
+        %% Read a long directly from the file (not the block).
+        function val = read_file_long( obj )           
+            bytes = fread( obj.fid, 8, '*uint8' );
+            val = typecast( bytes, 'int64' );
+        end
+        
+        %% Read an int directly from the file (not the block).
+        function val = read_file_int( obj )           
+            bytes = fread( obj.fid, 4, '*uint8' );
+            val = typecast( bytes( end : -1 : 1 ), 'int32' );
+        end
+        
+        %% Read an int directly from the file (not the block).
+        function val = read_file_uint( obj )           
+            bytes = fread( obj.fid, 4, '*uint8' );
+            val = typecast(  bytes( end : -1 : 1 ), 'uint32' );
+        end
+        
+        %% Read a byte directly from the file (not the block).
+        function val = read_file_byte( obj )           
+            val = fread( obj.fid, 1, '*uint8' );
+        end
+        
+        %% Read a UTF8 directly from the file (not the block).
+        function str = read_file_utf8( obj )
+            % Serialized UTF8 string starts with a short int giving 
+            % the string length.
+            str_length = fread( obj.fid, 1, 'uint16' );
+            % Then we just have to convert the right number of bytes to chars.
+            bytes = fread( obj.fid, str_length, '*uint8' );
+            str = native2unicode( bytes', 'UTF-8' );
+        end
+        
+        %% Read a string directly from the file (not the block).
+        function str = read_file_string( obj )
+            % String = TC_STRING + UTF8.
+            fread( obj.fid, 1, '*uint8' ); % should be #74 - >116
+            str = obj.read_file_utf8(); 
+        end
+    end
+    
+    methods ( Access = protected )
+        
         %% Read a block in the Java bin file and stores it in the class.
         function fetch_block( obj )
             
