@@ -4,20 +4,39 @@ classdef JavaRawReader < handle
         fid
         block
         index
-        stream_magic_number
-        stream_version
     end % properties
     
     methods
         
         %% Constructor.
         function obj = JavaRawReader( raw_file_path )
+            
+            EXPECTED_STREAM_MAGIC_NUMBER    = -21267;
+            EXPECTED_STREAM_VERSION         = 5;
+            
             obj.fid = fopen( raw_file_path, 'r', 'b' );
+            if obj.fid < 0
+                error( 'JavaRawReader:cannotOpenFile', ...
+                    'Could not open file %s for reading.', raw_file_path )
+            end
+            
             obj.block = zeros( 0, 0, 'uint8' );
             obj.index = 0;
             
-            obj.stream_magic_number = fread( obj.fid, 1, 'int16' );
-            obj.stream_version = fread( obj.fid, 1, 'int16' );
+            stream_magic_number = fread( obj.fid, 1, 'int16' );
+            if stream_magic_number ~= EXPECTED_STREAM_MAGIC_NUMBER
+                 error( 'JavaRawReader:badBinFile', ...
+                    'Unexpected magic number for file %s. Expected %d, got %d. Not a Java raw file?', ...
+                    raw_file_path, EXPECTED_STREAM_MAGIC_NUMBER, stream_magic_number )
+            end
+            
+            stream_version = fread( obj.fid, 1, 'int16' );
+            if stream_version ~= EXPECTED_STREAM_VERSION
+                 error( 'JavaRawReader:badBinFile', ...
+                    'Unexpected stream version for file %s. Expected %d, got %d. Not a Java raw file?', ...
+                    raw_file_path, EXPECTED_STREAM_VERSION, stream_version )
+            end
+            
         end        
         
         %% Destructor.
