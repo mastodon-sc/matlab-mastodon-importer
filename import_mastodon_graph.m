@@ -21,6 +21,11 @@ function graph = import_mastodon_graph( mastodon_model_file )
     row_names( idx + 1 ) = labels;
     
     spot_table.label = row_names;
+    empty = cell( 13, 1 );
+    empty(:) = { '' };
+    spot_table.Properties.VariableUnits = empty; % TODO
+    spot_table.Properties.VariableDescriptions = empty;
+
     
     %% Finished reading!
     
@@ -31,6 +36,11 @@ function graph = import_mastodon_graph( mastodon_model_file )
     edge_table = table();
     % Again, we assume that the row indices are equal to the vertex id + 1.
     edge_table.EndNodes = [ 1 + link_table.source_id, 1 + link_table.target_id ];
+    empty = { '' };
+    edge_table.Properties.VariableUnits = empty; % TODO
+    edge_table.Properties.VariableDescriptions = empty;
+    edge_table.id = link_table.id;
+
     
     graph = digraph( edge_table, spot_table );
     
@@ -120,7 +130,7 @@ function graph = import_mastodon_graph( mastodon_model_file )
             source_id, ...
             target_id, ...
             source_out_index, ...
-            target_in_index );
+            target_in_index );        
     end
     
     function [ labels, vertex_ids ] = read_label_property( reader )
