@@ -34,6 +34,17 @@ classdef ByteBlockReader < handle
             end
         end
         
+        %% Get a double.
+        function val = read_double_rev( obj )
+            try
+                val = typecast( obj.block( obj.index + 7 : -1 : obj.index ), 'double' );
+                obj.index = obj.index + 8;
+            catch ME %#ok<NASGU>
+                fetch_block( obj )
+                val = read_double_rev( obj );
+            end
+        end
+        
         %% Get N doubles.
         function vals = read_n_doubles( obj, n )
             try
