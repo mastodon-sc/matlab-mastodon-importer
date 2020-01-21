@@ -1,4 +1,4 @@
-function [ tag_table_vertices, tag_table_edges, tss ]  = import_mastodon_tags( mastodon_tag_file )
+function [ spot_table, link_table, tss ]  = import_mastodon_tags( mastodon_tag_file, spot_table, link_table )
 %% Deserialize a Mastodon tag file.
 
 
@@ -12,29 +12,28 @@ function [ tag_table_vertices, tag_table_edges, tss ]  = import_mastodon_tags( m
     
     %% Read vertices tags.
     
-    [ map_vertices, label_sets_vertices ] = read_label_set_property_map( reader );
-    
-    [ map_edges, label_sets_edges ] = read_label_set_property_map( reader );
+    [ map_vertices, label_sets_vertices ]   = read_label_set_property_map( reader );
+    [ map_edges,    label_sets_edges ]      = read_label_set_property_map( reader );
     
     reader.close();
     
     %% Create tag tables.
     
-    tag_table_vertices = create_tag_table( map_vertices, label_sets_vertices, tss );
-    tag_table_edges = create_tag_table( map_edges, label_sets_edges, tss );    
+    spot_table = append_tags_to_table( map_vertices,    label_sets_vertices,    tss, spot_table );
+    link_table = append_tags_to_table( map_edges,       label_sets_edges,       tss, link_table );
+    
+    % Finished!
+    
     
     %% Functions.
     
-    function tag_table = create_tag_table( map, label_sets, tss )
+    function T = append_tags_to_table( map, label_sets, tss, T )
         
         % Prepare columns.
         n_tag_set = numel( tss );
         columns = cell( 1, n_tag_set );
         for i = 1 : n_tag_set
-            
-            columns{ i } =  cell( size( map, 1 ), 1 );
-            columns{ i }(:) = { '' };
-            
+            columns{ i } = NaN( height( T ), 1 );
         end
         
         % Map tag ids to tag_set.
@@ -58,24 +57,43 @@ function [ tag_table_vertices, tag_table_edges, tss ]  = import_mastodon_tags( m
         
         n_label_sets = numel( label_sets );
         
+        % Process label-set by label-set.
         for i = 1 : n_label_sets
+            
             label_set = label_sets{ i };
             n_labels = numel( label_set );
             
             for j = 1 : n_labels
-                tag_id = label_set( j );
-                tag_name = tag_map{ 1 + tag_id };
-                tag_set = tag_set_map( 1 + tag_id );
                 
-                idx = ( map( : , 2 ) == ( i - 1  ) ); % 1 -> 0
-                columns{ tag_set }( idx ) = { tag_name };
+                % What is the tag-id of this element in the label set?
+                tag_id = label_set( j );
+                
+                % What tag-set column are we editing for this tag_id?
+                tag_set = tag_set_map( 1 + tag_id ); 
+                
+                % What rows, in the map, have this label-set?
+                idx2 = ( map( : , 2 ) == ( i - 1  ) ); % 1 -> 0
+                
+                % What object ids correspond to these rows?
+                object_ids = map( idx2, 1 );
+                
+                % What are the rows, in the table, that have these ids?
+                [ ~, idx1 ] = ismember( object_ids, T.id );
+
+                % Fill these rows with the tag_id
+                columns{ tag_set }( idx1 ) = tag_id;
+                
             end
         end
         
-        tag_table = table();
-        tag_table.id = map( :, 1 );
         for i = 1 : n_tag_set
-            tag_table.( tss( i ).name ) = categorical( columns{ i } );
+            T.( tss( i ).name ) = categorical( ...
+                columns{ i }, ...
+                [ tss(i).tags.id], ...
+                { tss(i).tags.label } );
+            
+            T.Properties.VariableUnits = [ T.Properties.VariableUnits, '' ];
+            T.Properties.VariableDescriptions = [ T.Properties.VariableDescriptions, '' ];
         end
         
         

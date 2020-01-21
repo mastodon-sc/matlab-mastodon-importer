@@ -1,4 +1,4 @@
-function graph = import_mastodon_graph( mastodon_model_file )
+function [ spot_table, link_table ] = import_mastodon_graph( mastodon_model_file )
 
    
     %% Open file.
@@ -11,7 +11,6 @@ function graph = import_mastodon_graph( mastodon_model_file )
     
     %% Read the label property.
     
-    
     [ labels, idx ]  = read_label_property( reader );
     
     % Put labels as row names in the spot table.
@@ -21,32 +20,27 @@ function graph = import_mastodon_graph( mastodon_model_file )
     row_names( idx + 1 ) = labels;
     
     spot_table.label = row_names;
-    empty = cell( 13, 1 );
-    empty(:) = { '' };
-    spot_table.Properties.VariableUnits = empty; % TODO
-    spot_table.Properties.VariableDescriptions = empty;
 
     
     %% Finished reading!
     
     reader.close()
     
-    %% Assemble graph.
+    %% Tables metadata.
     
-    edge_table = table();
-    % Again, we assume that the row indices are equal to the vertex id + 1.
-    edge_table.EndNodes = [ 1 + link_table.source_id, 1 + link_table.target_id ];
-    empty = { '' };
-    edge_table.Properties.VariableUnits = empty; % TODO
-    edge_table.Properties.VariableDescriptions = empty;
-    edge_table.id = link_table.id;
+    empty = cell( 13, 1 );
+    empty(:) = { '' };
+    spot_table.Properties.VariableUnits = empty; % TODO
+    spot_table.Properties.VariableDescriptions = empty;
+
+    empty = cell( 2, 1 );
+    empty(:) = { '' };
+    link_table.Properties.VariableUnits = empty; % TODO
+    link_table.Properties.VariableDescriptions = empty;
 
     
-    graph = digraph( edge_table, spot_table );
-    
         
-    %% Functions.
-    
+    %% Sub-functions.
     
     function[ spot_table, link_table ] = read_graph( reader )
         
@@ -112,8 +106,6 @@ function graph = import_mastodon_graph( mastodon_model_file )
         
         source_id	= NaN( n_edges, 1 );
         target_id	= NaN( n_edges, 1 );
-        source_out_index	= NaN( n_edges, 1 );
-        target_in_index     = NaN( n_edges, 1 );
         id          = NaN( n_edges, 1 );
         
         for i = 1 : n_edges
@@ -125,12 +117,10 @@ function graph = import_mastodon_graph( mastodon_model_file )
             
         end
         
+        EndNodes = [ 1 + source_id, 1 + target_id ];
         link_table = table( ...
-            id, ...
-            source_id, ...
-            target_id, ...
-            source_out_index, ...
-            target_in_index );        
+            EndNodes, ...
+            id );        
     end
     
     function [ labels, vertex_ids ] = read_label_property( reader )
