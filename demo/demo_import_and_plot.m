@@ -1,6 +1,6 @@
 %% Develop and test the feasibility of importing Mastodon files into MATLAB.
 
-close
+close all
 clear
 clc
 
@@ -26,6 +26,9 @@ fprintf('Imported %d spots and %d links in %.1f seconds.\n', ...
 % Only retain long tracks and tracks that are close to coverslip.
 % G = filter_tracks( G );
 
+% Basic data plotting for inspection.
+s = make_data_scatter_plot( G );
+
 % Plot each track separately (slow) with a different color.
 h_tracks = plot_individual_tracks( G );
 
@@ -39,6 +42,19 @@ h_ell = plot_cell_ellipsoids( G, 1 );
 
 
 %% Demo functions.
+
+function s = make_data_scatter_plot( G )
+    figure;
+    s = scatter( G.Nodes.SpotGaussianFilteredIntensityMeanCh1, G.Nodes.z, 75, sqrt(G.Nodes.bsrs), 'filled' );
+    s.MarkerEdgeColor = [ 0.3 0.3 0.3 ];
+    
+    xlabel( 'Mean intensity' );
+    ylabel( sprintf( 'Z position (%s)', G.Nodes.Properties.VariableUnits{4} ) )
+    colormap jet
+    c = colorbar;
+    c.Label.String = sprintf( 'Approx size (%s)', G.Nodes.Properties.VariableUnits{4} );
+end
+
 
 function h = plot_cell_ellipsoids( G, timepoint )
 %% Plot all the cells of time-point 1 as ellipsoids.
