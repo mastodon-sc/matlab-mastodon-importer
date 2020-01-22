@@ -1,7 +1,25 @@
-function [ G, tss ] = import_mastodon( source_file )
+function [ G, metadata, tss ] = import_mastodon( source_file )
 
     % Uncompress data file into temp dir.
     filenames = unzip( source_file, fullfile( tempdir, source_file ) );
+    
+    %% Read the metadata from master file.
+    
+    % Find the uncompressed master XML file -> project.xml.
+    mastodon_master_file = get_master_file( filenames );
+    % Import it.
+    metadata = import_mastodon_metadata( mastodon_master_file );
+    
+    % Deal with relative path -> make it absolute.
+    if strcmp( metadata.spim_data_file_path_type, 'relative' )
+        file_path = fileparts( source_file );
+        
+        metadata.spim_data_file_path = resolve_path( fullfile( ...
+            file_path, ...
+            metadata.spim_data_file_path ) );
+        
+        metadata.spim_data_file_path_type = 'absolute';            
+    end
     
     %% Read the model file.
     
@@ -9,6 +27,15 @@ function [ G, tss ] = import_mastodon( source_file )
     mastodon_model_file = get_model_file( filenames );
     % Deserialize it.
     [ spot_table, link_table ] = import_mastodon_graph( mastodon_model_file );
+
+    % Fix the variable units.
+    % Spot position.
+    spot_table.Properties.VariableUnits( 2:4 ) = { metadata.space_units };
+    % Spot time, which is always 'frame' units.
+    spot_table.Properties.VariableUnits( 5 ) = { metadata.time_units };
+    % Covariance matrix.
+    spot_table.Properties.VariableUnits( 6:12 ) = { sprintf( '%s^2', metadata.space_units ) };
+
     
     %% Read the tag file.
     
@@ -35,6 +62,25 @@ function [ G, tss ] = import_mastodon( source_file )
     
     %% Functions.
     
+    function full_path = resolve_path( file_name )
+        file=java.io.File( file_name );
+        if file.isAbsolute()
+            full_path = file_name;
+        else
+            full_path = char( file.getCanonicalPath() );
+        end
+    end
+        
+        function master_file = get_master_file( filenames )
+            id = find( ~cellfun( @isempty, regexp( filenames, '.*project.xml$') ) );
+            if isempty( id )
+                error( 'MastodonImporter:missingMasterFile', ...
+                    'Could not find master file in Mastodon file.' )
+            end
+            
+        master_file = filenames{ id };
+    end
+    
     function mastodon_feature_files = get_feature_files( filenames )
         
         ids = ~cellfun( @isempty, regexp( filenames, '.*/features/.*\.raw$') );
@@ -42,7 +88,6 @@ function [ G, tss ] = import_mastodon( source_file )
     end
 
     function model_file = get_model_file( filenames )
-        
         id = find( ~cellfun( @isempty, regexp( filenames, '.*model.raw$') ) );
         if isempty( id )
             error( 'MastodonImporter:missingModelFile', ...
@@ -53,7 +98,6 @@ function [ G, tss ] = import_mastodon( source_file )
     end
 
     function tag_file = get_tag_file( filenames )
-        
         id = find( ~cellfun( @isempty, regexp( filenames, '.*tags.raw$') ) );
         if isempty( id )
             error( 'MastodonImporter:missingTagFile', ...
