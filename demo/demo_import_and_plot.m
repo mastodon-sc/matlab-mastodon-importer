@@ -4,12 +4,16 @@ close
 clear
 clc
 
-% source_file = 'samples/mamutproject.mastodon';
-% source_file = 'samples/datasethdf5.mastodon';
-% source_file = 'samples/small2.mastodon';
-source_file = '/Users/tinevez/Projects/JYTinevez/MaMuT/Mastodon-dataset/MaMuT_Parhyale_demo-mamut.mastodon';
+%% Add the import files to the MATLAB path.
+
+% This changes the path, but only for this session. It will be forgotten
+% after you restart MATLAB.
+addpath( '../src' )
+
 
 %% Load data.
+
+source_file = 'mamutproject.mastodon';
 
 tic
 [ G, metadata, tss ] = import_mastodon( source_file );
@@ -27,10 +31,10 @@ h_tracks = plot_individual_tracks( G );
 
 % Plot objects according to a tag.
 target_ts = 2; % Take the second tag-set.
-% plot_colored_by_tag( G, tss, target_ts );
+plot_colored_by_tag( G, tss, target_ts );
 
 % Plot all the cells of time-point 1 as ellipsoids.
-% h_ell = plot_cell_ellipsoids( G, 1 );
+h_ell = plot_cell_ellipsoids( G, 1 );
 
 
 
@@ -99,9 +103,9 @@ function plot_colored_by_tag( G, tss, target_ts )
 
     plot( G, ...
         'ArrowSize', 0, ...
-        'XData', G_filt.Nodes.x, ...
-        'YData', G_filt.Nodes.y, ...
-        'ZData', G_filt.Nodes.z, ...
+        'XData', G.Nodes.x, ...
+        'YData', G.Nodes.y, ...
+        'ZData', G.Nodes.z, ...
         'NodeColor', node_colors, ...
         'EdgeColor', edge_colors, ...
         'MarkerSize', 10, ...
