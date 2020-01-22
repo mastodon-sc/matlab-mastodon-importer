@@ -92,7 +92,7 @@ classdef ByteBlockReader < handle
                 obj.index = obj.index + 4;
             catch ME %#ok<NASGU>
                 fetch_block( obj )
-                val = read_int( obj );
+                val = read_int_rev( obj );
             end
         end
         
