@@ -1,5 +1,3 @@
-
-
 # A MATLAB importer for Mastodon files.
 
 This repository contains several MATLAB functions used to import Mastodon files (https://github.com/fiji/TrackMate3). The import procedure is based on directly deserialising the binary files using MATLAB low-level API, and therefore has no dependency. 
@@ -150,8 +148,8 @@ The spot ellipsoid shape is represented through a covariance matrix. The covaria
 
 ``` matlab
 C = 	[  	c_11, 	c_12, 	c_13
-					c_12, 	c_22,		c_23
-					c_13,		c_23,		c_33 ];
+		c_12, 	c_22,	c_23
+		c_13,	c_23,	c_33 ];
 ```
 
 The `bsrs`  variable contains the bounding-sphere radius squared. It is the radius of the smallest sphere that includes the spot ellipsoid fully, squared.
@@ -269,34 +267,34 @@ The screenshots below mostly exemplify what can be done from the imported data s
 
 ### Import the full track graph and the spot ellipsoids.
 
-![After importing top view](images/ScreenShot1.png?raw=true"After importing top view")
+![After importing top view](images/ScreenShot1.png?raw=true "After importing top view")
 
-![After importing side view](images/ScreenShot2.png?raw=true"After importing side view")
+![After importing side view](images/ScreenShot2.png?raw=true "After importing side view")
 
 
 #### Import the tags and use them to color spots and links.
 
-![Nodes table with tags](images/ScreenShot3.png?raw=true"Nodes table with tags")
+![Nodes table with tags](images/ScreenShot3.png?raw=true "Nodes table with tags")
 
-![Coloring by tags](images/ScreenShot4.png?raw=true"Coloring by tags")
+![Coloring by tags](images/ScreenShot4.png?raw=true "Coloring by tags")
 
 ### The MaMuT dataset imported as ellipsoids.
 
 This is the results of the detection of cells using the TGMM framework of Amat *et al.*, 2014.
 
-![The MaMuT dataset](images/ScreenShot5.png?raw=true"The MaMuT dataset")
+![The MaMuT dataset](images/ScreenShot5.png?raw=true "The MaMuT dataset")
 
-![The MaMuT dataset](images/ScreenShot6.png?raw=true"The MaMuT dataset")
+![The MaMuT dataset](images/ScreenShot6.png?raw=true "The MaMuT dataset")
 
 ### Colouring individual tracks.
 
-![Tracks in the MaMuT dataset](images/ScreenShot7.png?raw=true"Tracks in the MaMuT dataset")
+![Tracks in the MaMuT dataset](images/ScreenShot7.png?raw=true "Tracks in the MaMuT dataset")
 
 ### A smaller dataset.
 
-![A smaller dataset](images/ScreenShot9.png?raw=true"A smaller dataset")
+![A smaller dataset](images/ScreenShot9.png?raw=true "A smaller dataset")
 
-![A smaller dataset](images/ScreenShot8.png?raw=true"A smaller dataset")
+![A smaller dataset](images/ScreenShot8.png?raw=true "A smaller dataset")
 
 ### Inspecting the data numerical features.
 
@@ -312,4 +310,4 @@ c = colorbar;
 c.Label.String = sprintf( 'Approx size (%s)', G.Nodes.Properties.VariableUnits{4} );
 ```
 
-![Numerical features](images/ScreenShot10.png?raw=true"Numerical features")
+![Numerical features](images/ScreenShot10.png?raw=true "Numerical features")
