@@ -12,12 +12,27 @@ function [ G, metadata, tss ] = import_mastodon( source_file )
     
     % Deal with relative path -> make it absolute.
     if strcmp( metadata.spim_data_file_path_type, 'relative' )
-        file_path = fileparts( source_file );
+
+        % Path to the source file folder.
+        io_file = java.io.File( source_file );
+        if ~io_file.isAbsolute()            
+            full_path = fullfile( pwd, source_file );
+        else
+            full_path = source_file;
+        end
+        file_path = fileparts( full_path );
         
-        metadata.spim_data_file_path = resolve_path( fullfile( ...
+        % Remove the first "../" because we are relative to the folder
+        % where the Mastodon file is already.
+        pruned_file_path = metadata.spim_data_file_path(4 : end );
+        
+        % Simplify path.
+        full_path = java.io.File( fullfile( ...
             file_path, ...
-            metadata.spim_data_file_path ) );
+            pruned_file_path ) );
+        full_path_trimmed = char( full_path.getCanonicalPath() );
         
+        metadata.spim_data_file_path = full_path_trimmed;
         metadata.spim_data_file_path_type = 'absolute';            
     end
     
@@ -61,22 +76,13 @@ function [ G, metadata, tss ] = import_mastodon( source_file )
     
     
     %% Functions.
-    
-    function full_path = resolve_path( file_name )
-        file=java.io.File( file_name );
-        if file.isAbsolute()
-            full_path = file_name;
-        else
-            full_path = char( file.getCanonicalPath() );
-        end
-    end
         
-        function master_file = get_master_file( filenames )
-            id = find( ~cellfun( @isempty, regexp( filenames, '.*project.xml$') ) );
-            if isempty( id )
-                error( 'MastodonImporter:missingMasterFile', ...
-                    'Could not find master file in Mastodon file.' )
-            end
+    function master_file = get_master_file( filenames )
+        id = find( ~cellfun( @isempty, regexp( filenames, '.*project.xml$') ) );
+        if isempty( id )
+            error( 'MastodonImporter:missingMasterFile', ...
+                'Could not find master file in Mastodon file.' )
+        end
             
         master_file = filenames{ id };
     end
