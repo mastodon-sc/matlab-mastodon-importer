@@ -1,6 +1,33 @@
+Table of Contents
+=================
+
+   * [A MATLAB importer for Mastodon files.](#a-matlab-importer-for-mastodon-files)
+      * [Running a quick demo.](#running-a-quick-demo)
+      * [Installation.](#installation)
+      * [Usage.](#usage)
+         * [The data graph.](#the-data-graph)
+         * [The ellipsoid and the covariance matrix.](#the-ellipsoid-and-the-covariance-matrix)
+         * [The metadata.](#the-metadata)
+         * [The tag-set structure.](#the-tag-set-structure)
+      * [Performance.](#performance)
+      * [Limitation.](#limitation)
+      * [Examples.](#examples)
+         * [Import the full track graph and the spot ellipsoids.](#import-the-full-track-graph-and-the-spot-ellipsoids)
+            * [Import the tags and use them to color spots and links.](#import-the-tags-and-use-them-to-color-spots-and-links)
+         * [The MaMuT dataset imported as ellipsoids.](#the-mamut-dataset-imported-as-ellipsoids)
+         * [Colouring individual tracks.](#colouring-individual-tracks)
+         * [A smaller dataset.](#a-smaller-dataset)
+         * [Inspecting the data numerical features.](#inspecting-the-data-numerical-features)
+
+
+
+
+
 # A MATLAB importer for Mastodon files.
 
 This repository contains several MATLAB functions used to import Mastodon files (https://github.com/fiji/TrackMate3). The import procedure is based on directly deserialising the binary files using MATLAB low-level API, and therefore has no dependency. 
+
+
 
 ## Running a quick demo.
 
