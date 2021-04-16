@@ -89,7 +89,13 @@ function [ G, metadata, tss ] = import_mastodon( source_file )
     
     function mastodon_feature_files = get_feature_files( filenames )
         
-        ids = ~cellfun( @isempty, regexp( filenames, '.*/features/.*\.raw$') );
+        if ispc
+            pattern = '.*\\features\\.*\.raw$';
+        else
+            pattern = '.*/features/.*\.raw$';
+        end
+        
+        ids = ~cellfun( @isempty, regexp( filenames, pattern ) );
         mastodon_feature_files = filenames( ids );
     end
 
