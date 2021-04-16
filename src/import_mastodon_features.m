@@ -13,6 +13,10 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
                 % Do not import.
                 continue
                 
+            case 'Spot radius'
+                projections = import_spot_radius_feature( mastodon_feature_file );
+                add_to = 'Spot';
+                
             case 'Detection quality'
                 projections = import_feature_scalar_double( mastodon_feature_file );
                 add_to = 'Spot';
@@ -56,6 +60,7 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
             otherwise 
                 warning( 'import_mastodon:UnkownFeature', ...
                     'Do not know how to import feature "%s".', feature_name )
+                continue
 
         end
         
@@ -92,6 +97,20 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
         
         T.Properties.VariableUnits{ width( T ) }        = projection.units;
         T.Properties.VariableDescriptions{ width( T ) } = projection.info;
+    end
+
+    function projection = import_spot_radius_feature( mastodon_feature_file )
+        
+        reader = JavaRawReader( mastodon_feature_file );
+        projection.key         = 'Spot radius';
+        projection.info        = 'Computes the spot equivalent radius. This is the radius of the sphere that would have the same volume that of the spot.';
+        projection.dimension   = 'LENGTH';
+        projection.units       = reader.read_utf8();
+        if isempty( projection.units )
+            projection.units = '';
+        end
+        projection.map = import_double_map( reader );
+        reader.close()
     end
 
     function projections = import_spot_sum_intensity_feature( mastodon_feature_file )
