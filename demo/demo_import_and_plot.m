@@ -45,7 +45,7 @@ h_ell = plot_cell_ellipsoids( G, 1 );
 
 function s = make_data_scatter_plot( G )
     figure;
-    s = scatter( G.Nodes.SpotGaussianFilteredIntensityMeanCh1, G.Nodes.z, 75, sqrt(G.Nodes.bsrs), 'filled' );
+    s = scatter( G.Nodes.SpotIntensityMeanCh1, G.Nodes.z, 75, sqrt(G.Nodes.bsrs), 'filled' );
     s.MarkerEdgeColor = [ 0.3 0.3 0.3 ];
     
     xlabel( 'Mean intensity' );
