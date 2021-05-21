@@ -57,6 +57,18 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
                 projections = import_spot_sum_intensity_feature( mastodon_feature_file );
                 add_to = 'Spot';
                 
+            case 'Spot intensity'
+                projections = import_spot_intensity_feature( mastodon_feature_file );
+                add_to = 'Spot';
+                
+            case 'Spot center intensity'
+                projections = import_spot_center_intensity_feature( mastodon_feature_file );
+                add_to = 'Spot';
+
+            case 'Spot quick mean'
+                projections = import_spot_quick_mean_feature( mastodon_feature_file );
+                add_to = 'Spot';
+                
             otherwise 
                 warning( 'import_mastodon:UnkownFeature', ...
                     'Do not know how to import feature "%s".', feature_name )
@@ -237,6 +249,99 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
         projection.map = import_double_map( reader );
         reader.close()
     end
+
+function projections = import_spot_intensity_feature( mastodon_feature_file )
+        info = [ 'Computes spot intensity features like mean, median, etc for all the channels of the source image. ' ...
+            'All the pixels within the spot ellipsoid are taken into account' ];
+        reader = JavaRawReader( mastodon_feature_file );
+        n_sources = reader.read_int();
+        for ch = 1 : n_sources
+            
+            % Mean.
+            projection.key         = sprintf( 'Spot intensity Mean ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( 6 * ch - 5 ) = projection; %#ok<AGROW>
+            
+            % Std.
+            projection.key         = sprintf( 'Spot intensity Std ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( 6 * ch - 4 ) = projection; %#ok<AGROW>
+
+            % Min.
+            projection.key         = sprintf( 'Spot intensity Min ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( 6 * ch - 3 ) = projection; %#ok<AGROW>
+
+            % Max.
+            projection.key         = sprintf( 'Spot intensity Max ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( 6 * ch - 2 ) = projection; %#ok<AGROW>
+
+            % Medians.
+            projection.key         = sprintf( 'Spot intensity Median ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( 6 * ch - 1 ) = projection; %#ok<AGROW>
+
+            % Sums.
+            projection.key         = sprintf( 'Spot intensity Sum ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( 6 * ch ) = projection; %#ok<AGROW>
+
+        end
+        reader.close()
+    end
+
+    function projections = import_spot_center_intensity_feature( mastodon_feature_file )
+        info = [ 'Computes the intensity at the center of spots by taking the mean of pixel intensity ' ...
+            'weigthted by a gaussian. The gaussian weights are centered int the spot, ' ...
+            'and have a sigma value equal to the minimal radius of the ellipsoid divided by 2.' ];
+        reader = JavaRawReader( mastodon_feature_file );
+        n_sources               = reader.read_int();
+        for ch = 1 : n_sources
+            projections.key         = sprintf( 'Spot center intensity ch%d', ch );
+            projections.info        = info;
+            projections.dimension   = 'INTENSITY';
+            projections.units       = 'Counts';
+            projections.map         = import_double_map( reader );
+            projections( ch ) = projections; %#ok<AGROW>
+        end
+        reader.close()
+    end
+
+    function projections = import_spot_quick_mean_feature( mastodon_feature_file )
+        info = [ 'Computes the mean intensity of spots using the highest resolution level to speedup calculation. ' ...
+					'It is recommended to use the "Spot intensity" feature when the best accuracy is required.' ];
+        reader = JavaRawReader( mastodon_feature_file );
+        n_sources               = reader.read_int();
+        for ch = 1 : n_sources
+            projections.key         = sprintf( 'Spot center intensity ch%d', ch );
+            projections.info        = info;
+            projections.dimension   = 'INTENSITY';
+            projections.units       = 'Counts';
+            projections.map         = import_double_map( reader );
+            projections( ch ) = projections; %#ok<AGROW>
+        end
+        reader.close()
+    end
+
 
     function map = import_double_map( reader )
         n_entries   = reader.read_int();
