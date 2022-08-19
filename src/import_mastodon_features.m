@@ -26,11 +26,18 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
                 add_to = 'Link';
                 
             case 'Link displacement'
-                projections = import_link_displacement_feature( mastodon_feature_file );
+                projs = import_lazy_feature( mastodon_feature_file, ...
+                    { [ 'The link displacement in physical units ' ...
+                        'as the distance between the source spot and the target spot.' ] } );
+                projections = projs{ 1 };
                 add_to = 'Link';
                 
             case 'Link velocity' 
-                projections = import_link_velocity_feature( mastodon_feature_file );
+                projs = import_lazy_feature( mastodon_feature_file, ...
+                    { [ 'The link velocity as the distance between the ' ...
+                        'source and target spots divided by their frame difference. ' ...
+                        'Units are in physical distance per frame.' ] } );
+                projections = projs{ 1 };
                 add_to = 'Link';
                 
             case 'Spot N links'
@@ -100,6 +107,26 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     
     %% Sub-functions.
     
+    
+    function projections = import_lazy_feature( mastodon_feature_file, infos )
+    %% IMPORT_LAZY_FEATURE Import the features serialized by the lazy feature serializer
+    % See https://github.com/mastodon-sc/mastodon/blob/dev/src/main/java/org/mastodon/feature/io/LazyFeatureSerializer.java
+        reader = JavaRawReader( mastodon_feature_file );
+        n_entries       = reader.read_int();        
+        n_projs         = reader.read_int(); 
+        projections = cell( n_projs, 1 );        
+        for j = 1 : n_projs
+            projection.key         = reader.read_utf8();
+            projection.dimension   = reader.read_utf8();
+            projection.units       = reader.read_utf8();
+            projection.info        = infos{ j };
+            projection.map         = import_double_map( reader, n_entries );
+            projections{ j } = projection;
+        end
+                
+        reader.close()
+    end
+    
     function T = add_projection_to_table( T, projection )
         
         col = NaN( height( T ), 1 );
@@ -115,7 +142,7 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
         
         reader = JavaRawReader( mastodon_feature_file );
         projection.key         = 'Spot radius';
-        projection.info        = 'Computes the spot equivalent radius. This is the radius of the sphere that would have the same volume that of the spot.';
+        projection.info        = 'The spot equivalent radius. This is the radius of the sphere that would have the same volume that of the spot.';
         projection.dimension   = 'LENGTH';
         projection.units       = reader.read_utf8();
         if isempty( projection.units )
@@ -126,8 +153,8 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     end
 
     function projections = import_spot_sum_intensity_feature( mastodon_feature_file )
-        info = [ 'Computes the total intensity inside a spot, ' ...
-            'for the pixels inside the spot ellipsoid.' ];
+        info = [ 'The total intensity inside a spot, ' ...
+                'for the pixels inside the spot ellipsoid.' ];
         reader = JavaRawReader( mastodon_feature_file );
         n_sources               = reader.read_int();
         for ch = 1 : n_sources
@@ -142,8 +169,8 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     end
 
     function projections = import_spot_median_intensity_feature( mastodon_feature_file )
-        info = [ 'Computes the median intensity inside a spot, ' ...
-            'for the pixels inside the largest box that fits into the spot ellipsoid.' ];
+        info = [ 'The median intensity inside a spot, ' ...
+                'for the pixels inside the largest box that fits into the spot ellipsoid.' ];
         reader = JavaRawReader( mastodon_feature_file );
         n_sources               = reader.read_int();
         for ch = 1 : n_sources
@@ -158,7 +185,7 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     end
     
     function projections = import_spot_gaussian_filtered_intensity_feature( mastodon_feature_file )
-        info = [ 'Computes the average intensity and its standard deviation inside spots over all ' ...
+        info = [ 'The average intensity and its standard deviation inside spots over all ' ...
             'sources of the dataset. The average is calculated by a weighted mean over the pixels ' ...
             'of the spot, weighted by a gaussian centered in the spot and with a sigma value equal ' ...
             'to the minimal radius of the ellipsoid divided by 2.' ];
@@ -189,7 +216,7 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     function projection = import_track_n_spots_feature( mastodon_feature_file )        
         reader = JavaRawReader( mastodon_feature_file );
         projection.key         = 'Track N spots';
-        projection.info        = 'Returns the number of spots in a track.';
+        projection.info        = 'The number of spots in a track.';
         projection.dimension   = 'NONE';
         projection.units       = '';
         projection.map         = import_int_map( reader );
@@ -199,7 +226,7 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     function projection = import_spot_track_id_feature( mastodon_feature_file )        
         reader = JavaRawReader( mastodon_feature_file );
         projection.key         = 'Spot track ID';
-        projection.info        = 'Returns the ID of the track each spot belongs to.';
+        projection.info        = 'The ID of the track each spot belongs to.';
         projection.dimension   = 'NONE';
         projection.units       = '';
         projection.map         = import_int_map( reader );
@@ -209,30 +236,10 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     function projection = import_spot_n_links_feature( mastodon_feature_file )        
         reader = JavaRawReader( mastodon_feature_file );
         projection.key         = 'Spot N links';
-        projection.info        = 'Computes the number of links that touch a spot.';
+        projection.info        = 'The number of links that touch a spot.';
         projection.dimension   = 'NONE';
         projection.units       = '';
         projection.map         = import_int_map( reader );
-        reader.close()
-    end
-    
-    function projection = import_link_displacement_feature( mastodon_feature_file )
-        reader = JavaRawReader( mastodon_feature_file );
-        projection.key         = 'Link displacement';
-        projection.info        = 'Computes the link displacement in physical units as the distance between the source spot and the target spot.';
-        projection.dimension   = 'LENGTH';
-        projection.units       = reader.read_utf8();
-        projection.map         = import_double_map( reader );
-        reader.close()
-    end
-
-    function projection = import_link_velocity_feature( mastodon_feature_file )
-        reader = JavaRawReader( mastodon_feature_file );
-        projection.key         = 'Link velocity';
-        projection.info        = 'Computes the link velocity as the distance between the source and target spots divided by their frame difference. Units are in physical distance per frame.';
-        projection.dimension   = 'VELOCITY';
-        projection.units       = reader.read_utf8();
-        projection.map         = import_double_map( reader );
         reader.close()
     end
     
@@ -251,7 +258,7 @@ function [ spot_table, link_table ] = import_mastodon_features( mastodon_feature
     end
 
 function projections = import_spot_intensity_feature( mastodon_feature_file )
-        info = [ 'Computes spot intensity features like mean, median, etc for all the channels of the source image. ' ...
+        info = [ 'Spot intensity features like mean, median, etc for all the channels of the source image. ' ...
             'All the pixels within the spot ellipsoid are taken into account' ];
         reader = JavaRawReader( mastodon_feature_file );
         n_sources = reader.read_int();
@@ -316,12 +323,12 @@ function projections = import_spot_intensity_feature( mastodon_feature_file )
         reader = JavaRawReader( mastodon_feature_file );
         n_sources               = reader.read_int();
         for ch = 1 : n_sources
-            projections.key         = sprintf( 'Spot center intensity ch%d', ch );
-            projections.info        = info;
-            projections.dimension   = 'INTENSITY';
-            projections.units       = 'Counts';
-            projections.map         = import_double_map( reader );
-            projections( ch ) = projections; %#ok<AGROW>
+            projection.key         = sprintf( 'Spot center intensity ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( ch ) = projection; %#ok<AGROW>
         end
         reader.close()
     end
@@ -332,19 +339,20 @@ function projections = import_spot_intensity_feature( mastodon_feature_file )
         reader = JavaRawReader( mastodon_feature_file );
         n_sources               = reader.read_int();
         for ch = 1 : n_sources
-            projections.key         = sprintf( 'Spot center intensity ch%d', ch );
-            projections.info        = info;
-            projections.dimension   = 'INTENSITY';
-            projections.units       = 'Counts';
-            projections.map         = import_double_map( reader );
-            projections( ch ) = projections; %#ok<AGROW>
+            projection.key         = sprintf( 'Spot center intensity ch%d', ch );
+            projection.info        = info;
+            projection.dimension   = 'INTENSITY';
+            projection.units       = 'Counts';
+            projection.map         = import_double_map( reader );
+            projections( ch ) = projection; %#ok<AGROW>
         end
         reader.close()
     end
 
-
-    function map = import_double_map( reader )
-        n_entries   = reader.read_int();
+    function map = import_double_map( reader, n_entries )
+        if nargin < 2
+            n_entries   = reader.read_int();
+        end
         map = NaN( n_entries, 2 );
         for proj = 1 : n_entries
             map( proj , 1 ) = reader.read_int();
@@ -353,8 +361,11 @@ function projections = import_spot_intensity_feature( mastodon_feature_file )
         
     end
 
-    function map = import_int_map( reader )
-        n_entries   = reader.read_int();
+
+    function map = import_int_map( reader, n_entries )
+        if nargin < 2
+            n_entries   = reader.read_int();
+        end
         map = NaN( n_entries, 2 );
         for proj = 1 : n_entries
             map( proj , 1 ) = reader.read_int();
