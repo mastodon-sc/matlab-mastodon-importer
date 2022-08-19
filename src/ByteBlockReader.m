@@ -108,12 +108,19 @@ classdef ByteBlockReader < handle
         end
         
         %% Get a utf8 string.
-        function str = read_utf8( obj )
+
+        
+        function str = read_utf8( obj, str_length )
+            if nargin < 2
+                str_length = -1;
+            end
             try
-                
                 % Serialized UTF8 string starts with a short int giving
                 % the string length.
-                str_length = obj.read_short();
+                % Read it only if we have not read it yet
+                if str_length < 0
+                    str_length = obj.read_short();
+                end
                 % Then we just have to convert the right number of bytes to chars.
                 bytes = obj.block( obj.index : obj.index + str_length - 1 );
                 str = native2unicode( bytes', 'UTF-8' );
@@ -121,7 +128,7 @@ classdef ByteBlockReader < handle
                 
             catch ME %#ok<NASGU>
                 fetch_block( obj )
-                str = read_utf8( obj );
+                str = read_utf8( obj, str_length );
             end
         end
         
